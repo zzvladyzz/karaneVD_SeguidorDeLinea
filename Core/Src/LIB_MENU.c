@@ -9,34 +9,39 @@
 //static Avisos_Alarmas_e 	Aviso;
 static Menu_Parametros_e 	Menu=Pagina_Inicial;
 static bool BTN_SEL=false;
-static Tiempo_bloqueante_s Tiempo_bloqueante_A={0,false,0};
+static Tiempo_espera_s Tiempo_={0,false,0};
 
 
 
-void	Tiempo_bloqueante()
+void	Tiempo_Espera()
 {
 
 	uint32_t tiempo_actual=HAL_GetTick();
-	switch (Tiempo_bloqueante_A.estado_interno) {
+	switch (Tiempo_.estado_interno) {
 		case 0:
-			Tiempo_bloqueante_A.tiempo_espera=tiempo_actual;
-			Tiempo_bloqueante_A.en_espera=true;
-			Tiempo_bloqueante_A.estado_interno=1;
+			Tiempo_.tiempo_espera=tiempo_actual;
+			Tiempo_.en_espera=true;
+			Tiempo_.estado_interno=1;
 			break;
 		case 1:
-			if(tiempo_actual-Tiempo_bloqueante_A.tiempo_espera>20)
+			if(tiempo_actual-Tiempo_.tiempo_espera>20)
 			{
-				Tiempo_bloqueante_A.estado_interno=2;
-				Tiempo_bloqueante_A.en_espera=false;
+				Tiempo_.estado_interno=2;
 			}
 			break;
 		case 2:
-			Tiempo_bloqueante_A.estado_interno=0;
+			Tiempo_.estado_interno=0;
+			Tiempo_.en_espera=false;
 			break;
 		default:
 			break;
 	}
 }
+/**
+ * @brief Menu donde se vera en que opcion entrar
+ * @param Menu recibira un enum para ver en que parte del menu nos encontramos
+ * @param Pulsador es una valor de 1 a 3 que viene de los pulsadores ya filtrado
+ */
 void 	Menu_Navegacion(uint8_t BTN)
 {
 	if(BTN_SEL==false){
@@ -67,6 +72,9 @@ void 	Menu_Navegacion(uint8_t BTN)
 
 
 }
+/**
+ * @brief Menu para realizar la funcion seleccionada
+ */
 void	Menu_Ejecucion(void)
 {
 	if(BTN_SEL==true){
@@ -104,18 +112,10 @@ void	Menu_Ejecucion(void)
 	}
 }
 
-/*
-Estado_ok,
-Estado_fallo,
-Estado_advertencia,
-Aviso_conectado,
-Aviso_procesando,
-Aviso_ok,
-Aviso_listo,
-Aviso_desconectado,
-Aviso_error_sensor,
-Aviso_bateria_baja,
-Aviso_fallo_comunicacion,*/
+/**
+ * @brief Aca se indicara mediante leds los errores o cualquier otra accion
+ * @param Aviso sera un valor entero con el cual se sabra que led usar
+ */
 void Menu_Avisos(Avisos_Alarmas_e Aviso_)
 {
 	switch(Aviso_){

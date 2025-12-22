@@ -114,7 +114,7 @@ typedef struct{
 	MPU6500_int_u MPU6500_ACCELX;
 	MPU6500_int_u MPU6500_ACCELY;
 	MPU6500_int_u MPU6500_ACCELZ;
-}MPU6500_Read_t;
+}MPU6500_Init_Values_t;
 
 typedef struct{
 	float MPU6500_floatGX;
@@ -131,13 +131,12 @@ typedef enum{MPU6500_ok,MPU6500_fail}MPU6500_status_e;
 //Para ver que no sucede un error al inicializar mpu y
 // Reset registros y validar ID y realizar primeras lecturas offset
 
-MPU6500_status_e 		MPU6500_Init(MPU6500_Read_t* offset,uint8_t N,uint8_t dps,uint8_t g);// Mejorar codigo muestreo
-void		MPU6500_Read(MPU6500_Read_t* valoresMPU);
+MPU6500_status_e 		MPU6500_Init(MPU6500_Init_Values_t* offset,uint8_t N,uint8_t dps,uint8_t g);// Mejorar codigo muestreo
+void		MPU6500_Read(MPU6500_Init_Values_t* valoresMPU);
 uint8_t 	MPU6500_Read_Reg(uint8_t Reg);
 void 		MPU6500_Write_Reg(uint8_t Reg,uint8_t value);
 void		MPU6500_Write(uint8_t Reg,uint8_t *value, uint8_t len);
-MPU6500_float_t		MPU6500_Scale(MPU6500_Read_t* raw,float dpsConv,float gConv);
-MPU6500_float_t		MPU6500_ConvRad(MPU6500_float_t* conv);
+MPU6500_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv);
 float		MPU6500_Pitch(MPU6500_float_t* convPitch);
 float		MPU6500_Roll(MPU6500_float_t* convRoll);
 

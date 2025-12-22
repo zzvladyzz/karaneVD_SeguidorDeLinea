@@ -32,12 +32,8 @@
 #include <math.h>
 #include "LIB_MPU6500_SPI.h"
 #include "LIB_FiltroMadgWick.h"
-// Constantes físicas del robot (debes medirlas y ajustarlas)
-#define TICKS_POR_REVOLUCION  200.0 // Cuantos ticks da el encoder por vuelta completa
-#define DIAMETRO_RUEDA_MM      	29.1571 // Diámetro de la rueda en mm y grosor 12,7
-#define DISTANCIA_ENTRE_RUEDAS_MM 105.8 // Distancia entre los centros de las ruedas
-#define LONGITUD_MUESTRA_MM (M_PI * DIAMETRO_RUEDA_MM / TICKS_POR_REVOLUCION)
-
+#include "LIB_DEBUG.h"
+#include "LIB_funciones.h"
 
 /* USER CODE END Includes */
 
@@ -48,9 +44,21 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+/*
+ *Aca tendremos la estructura para los datos del programa
+ */
+odometria_init_t odometria={0.0,0.0,0.0,0.0,0,0};
+MPU6500_Init_Values_t 	MPU6500_Datos; //Iniciamos donde se guardaran todos los datos a leer
+//MPU6500_float_t	MPU6500_Values_float;
+MPU6500_status_e	MPU6500_Status;
+//MadgWick_t 		MadgWick;
+
+
+
 uint32_t ADC_DMA[5];	//datos DMA
 volatile uint16_t ADC_buffer[4]; //datos ya obtenidos y convertidos a 16bits
-char bufferTxt[30];//buffer para enviar datos maximo 30
+
 uint16_t duty_pwm=0;
 uint8_t en_pwm=0;
 uint16_t ADC_poll=0;
@@ -59,17 +67,13 @@ uint32_t tiempoAnterior1=0;
 uint32_t tiempoAnterior2=0;
 uint32_t tiempo_conv=0;
 
+
+
 const int8_t estadoTabla[16]={0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0}; //valor encoders de tabla de verdad
 uint8_t estadoAnterior_L=0;
 uint8_t estadoAnterior_R=0;
-// Variables de estado global del robot
-volatile int32_t ticks_L = 0; // Contadores de los encoders (desde el callback EXTI)
-volatile int32_t ticks_R = 0;
 
-float robot_X = 0.0;     // Posición X actual en mm
-float robot_Y = 0.0;     // Posición Y actual en mm
-float robot_Angulo = 0.0; // Orientación/Rumor actual en radianes
-float robot_Angulo_180=0.0;
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -92,84 +96,6 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void UART_Send(UART_HandleTypeDef *huart, char buffer [])
-{
-	HAL_UART_Transmit(huart, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
-}
-void imprimir(void)
-{
-	/*sprintf(bufferTxt," ADC0=%u ",ADC_buffer[0]);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," ADC1=%u ",ADC_buffer[1]);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," ADC2=%u ",ADC_buffer[2]);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," ADC3=%u ",ADC_buffer[3]);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," ADC4=%u \r \n",ADC_poll);
-	UART_Send(&huart3, bufferTxt);
-
-	sprintf(bufferTxt," EncL=%ld ",ticks_L);
-		UART_Send(&huart3, bufferTxt);
-		sprintf(bufferTxt," EncR=%ld " ,ticks_R);
-		UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," LEncL=%0.2f ",ticks_L*LONGITUD_MUESTRA_MM);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," LEncR=%0.2f \r \n" ,ticks_R*LONGITUD_MUESTRA_MM);
-	UART_Send(&huart3, bufferTxt);
-
-*/
-
-
-
-	sprintf(bufferTxt," angulo=%0.2f ",robot_Angulo_180);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," x=%0.2f ",robot_X);
-	UART_Send(&huart3, bufferTxt);
-	sprintf(bufferTxt," y=%0.2f \r \n",robot_Y);
-	UART_Send(&huart3, bufferTxt);
-
-
-}
-void odometria(void)
-{
-/*
- * Codigo para odometria implementarlo en un timer para la ejecucion
- */
-// 1. Obtener los ticks desde la última vez y resetear contadores para evitar overflow de datos
-// Usamos variables intermedias para ser thread-safe (si las interrupciones EXTI pueden ocurrir ahora)
-int32_t delta_ticks_L = ticks_L;
-int32_t delta_ticks_R = ticks_R;
-ticks_L = 0; // Resetear el contador
-ticks_R = 0; // Resetear el contador
-
-// 2. Convertir ticks a distancia lineal recorrida (en mm)
-float distancia_L = delta_ticks_L * LONGITUD_MUESTRA_MM;
-float distancia_R = delta_ticks_R * LONGITUD_MUESTRA_MM;
-
-// Distancia promedio recorrida por el centro del robot
-float delta_distancia = (distancia_L + distancia_R) / 2.0;
-
-// 3. Calcular el cambio en la orientación angular (en radianes)
-float delta_angulo = (distancia_R - distancia_L) / DISTANCIA_ENTRE_RUEDAS_MM;
-
-// 4. Actualizar la posición global del robot (Integración)
-
-// Usamos el ángulo actual + la mitad del cambio angular para mayor precisión (Runge-Kutta de 2do orden)
-float angulo_promedio = robot_Angulo + delta_angulo / 2.0;
-
-// Calcular el desplazamiento en X e Y y sumarlo a la posición actual
-robot_X += delta_distancia * cos(angulo_promedio);
-robot_Y += delta_distancia * sin(angulo_promedio);
-
-// 5. Actualizar el ángulo global del robot
-robot_Angulo += delta_angulo;
-
-// Opcional: Mantener el ángulo entre -PI y PI (para evitar overflow float)
-if (robot_Angulo > M_PI) robot_Angulo -= 2 * M_PI;
-if (robot_Angulo < -M_PI) robot_Angulo += 2 * M_PI;
-robot_Angulo_180=(robot_Angulo*180.0)/M_PI;
-}
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	if(hadc->Instance==ADC1)
@@ -183,46 +109,25 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 
-
 	if(GPIO_Pin==ENCA_L_Pin||GPIO_Pin==ENCB_L_Pin)
 		{
 		uint8_t bitStatusL=((HAL_GPIO_ReadPin(ENCA_L_GPIO_Port, ENCA_L_Pin))?2:0) | ((HAL_GPIO_ReadPin(ENCB_L_GPIO_Port, ENCB_L_Pin))?1:0);
-		ticks_L+=estadoTabla[((estadoAnterior_L<<2)|bitStatusL)];
+		odometria.ticks_L+=estadoTabla[((estadoAnterior_L<<2)|bitStatusL)];
 		estadoAnterior_L=bitStatusL;
 		}
 	if(GPIO_Pin==ENCA_R_Pin||GPIO_Pin==ENCB_R_Pin)
 		{
 		uint8_t bitStatusR=((HAL_GPIO_ReadPin(ENCA_R_GPIO_Port, ENCA_R_Pin))?2:0) | ((HAL_GPIO_ReadPin(ENCB_R_GPIO_Port, ENCB_R_Pin))?1:0);
-		ticks_R+=(-estadoTabla[((estadoAnterior_R<<2)|bitStatusR)]);
+		odometria.ticks_R+=(-estadoTabla[((estadoAnterior_R<<2)|bitStatusR)]);
 		estadoAnterior_R=bitStatusR;
 		}
-	/*codigo no optimizado
-	 *
-	if (GPIO_Pin==ENCA_R_Pin || GPIO_Pin==ENCB_R_Pin)
-		{
-			uint8_t bitStatusR=((HAL_GPIO_ReadPin(ENCA_R_GPIO_Port, ENCA_R_Pin))?2:0) | ((HAL_GPIO_ReadPin(ENCB_R_GPIO_Port, ENCB_R_Pin))?1:0);
-			if(GPIO_Pin==ENCA_R_Pin)
-				{
-					if((bitStatusR&2)==2)
-						{
-						encR+=((bitStatusR&1)==1)?1:-1;
-						}
-					else{
-						encR+=((bitStatusR&1)==1)?-1:1;
-						}
-				}
-			else if(GPIO_Pin==ENCB_R_Pin)
-						{
-						if((bitStatusR&1)==1)
-							{
-							encR+=((bitStatusR&2)==2)?-1:1;
-							}
-							else{
-								encR+=((bitStatusR&2)==2)?1:-1;
-								}
-					}
-		}
-	 */
+}
+void leer_ADC(void)
+{
+	HAL_ADC_Start(&hadc2);
+	HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
+	ADC_poll=HAL_ADC_GetValue(&hadc2);
+	HAL_ADC_Stop(&hadc2);
 }
 /* USER CODE END 0 */
 
@@ -273,23 +178,15 @@ int main(void)
   __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_3,0);
   __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_4,0);
 
-
-//inicializamos librerias
- // MPU6500_Read_t 	MPU_6500_Read;
-  MPU6500_Read_t 	MPU_6500_Offset;
-  //MPU6500_float_t	MPU_6500_float;
-  MPU6500_status_e	MPU_6500_Status;
-  MadgWick_t 		MadgWick;
-  madgwickInit(&MadgWick);
-  MPU_6500_Status=MPU6500_Init(&MPU_6500_Offset,10,DPS1000,G4);
-  if (MPU_6500_Status==MPU6500_fail) {
+  MPU6500_Status=MPU6500_Init(&MPU6500_Datos,10,DPS1000,G4);
+  if (MPU6500_Status==MPU6500_fail) {
   	for (;;) {
-  	UART_Send(&huart3, "Fallo al iniciar MPU\r\n");
-  	HAL_Delay(500);
-  	}
+  		DEBUG_Imprimir("Fallo al iniciar MPU\r\n");
+  		HAL_Delay(500);
+  		}
   }
-  UART_Send(&huart3, "Exito al iniciar MPU\r\n");
-  	HAL_Delay(500);
+  DEBUG_Imprimir("Exito al iniciar MPU\r\n");
+  HAL_Delay(500);
 
 
   /* USER CODE END 2 */
@@ -303,7 +200,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  //HAL_ADC_Start_IT(&hadc1);
-	  imprimir();
 	  HAL_Delay(2000);
 	  for(;;){
 		  tiempoActual=HAL_GetTick();
@@ -313,28 +209,10 @@ int main(void)
 			  /*tiempo_conv=HAL_GetTick();
 			  for(int x=0;x<13;x++)
 			  {
-			  HAL_ADC_Start(&hadc2);
-			  HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
-			  ADC_poll=HAL_ADC_GetValue(&hadc2);
-			  HAL_ADC_Stop(&hadc2);
-			  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-			  				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-			  				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-			  				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-			  				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 1);
-			  				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 1);
 			  }
 			  HAL_Delay(1);
 			  tiempo_conv=HAL_GetTick()-tiempo_conv;*/
-			  imprimir();
 
-		  }
-
-		  if(tiempoActual-tiempoAnterior2>=10)
-		  {
-			  tiempoAnterior2=tiempoActual;
-			 // HAL_ADC_Start_IT(&hadc1);
-			  odometria();
 		  }
 
 

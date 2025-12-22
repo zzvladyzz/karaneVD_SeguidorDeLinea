@@ -14,7 +14,7 @@
 
 //Funciones
 
-void	MPU6500_Read(MPU6500_Read_t* valoresMPU){
+void	MPU6500_Read(MPU6500_Init_Values_t* valoresMPU){
 	uint8_t Reg=MPU_READ|ACCEL_XOUT_H;
 	uint8_t	Val[6];
 	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
@@ -69,7 +69,7 @@ void	MPU6500_Write(uint8_t Reg,uint8_t* value, uint8_t  len){
 	HAL_Delay(1);
 }
 
-MPU6500_status_e	MPU6500_Init(MPU6500_Read_t * offset,uint8_t N,uint8_t dps,uint8_t g){
+MPU6500_status_e	MPU6500_Init(MPU6500_Init_Values_t * offset,uint8_t N,uint8_t dps,uint8_t g){
 
 	double PromX[N],PromY[N],PromZ[N];
 	double SumaX,SumaY,SumaZ=0;
@@ -162,7 +162,7 @@ MPU6500_status_e	MPU6500_Init(MPU6500_Read_t * offset,uint8_t N,uint8_t dps,uint
 	return MPU6500_ok;
 
 }
-MPU6500_float_t		MPU6500_Scale(MPU6500_Read_t* raw,float dpsConv,float gConv)
+MPU6500_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv)
 {
 	MPU6500_float_t convDatos;
 	convDatos.MPU6500_floatAX=(raw->MPU6500_ACCELX.MPU6500_int16)/gConv;
@@ -195,7 +195,6 @@ float		MPU6500_Roll(MPU6500_float_t* convRoll){
 	return angulo_roll;
 }
 
-MPU6500_float_t		MPU6500_ConvRad(MPU6500_float_t* conv);
 
 
 
