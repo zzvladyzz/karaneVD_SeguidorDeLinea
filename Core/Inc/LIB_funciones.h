@@ -38,10 +38,7 @@ typedef struct
 	bool  enable_PWM;
 }motores_init_t;
 
-/**
- * @brief Codigo para odometria implementarlo en un timer para la ejecucion
- * @param odometria se inicializa con los datos a usar
- */
+
 void funcion_odometria(odometria_init_t* odometria);
 void motores(motores_init_t* motores);
 

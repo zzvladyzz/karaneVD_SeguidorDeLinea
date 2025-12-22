@@ -12,6 +12,10 @@
 
 extern TIM_HandleTypeDef Motor;
 
+/**
+ * @brief Codigo para odometria implementarlo en un timer para la ejecucion
+ * @param odometria se inicializa con los datos a usar
+ */
  void funcion_odometria(odometria_init_t* odometria)
 {
 // 1. Obtener los ticks desde la última vez y resetear contadores para evitar overflow de datos
@@ -48,6 +52,7 @@ if (odometria->robot_Angulo_rad > M_PI) odometria->robot_Angulo_rad -= 2 * M_PI;
 if (odometria->robot_Angulo_rad < -M_PI) odometria->robot_Angulo_rad += 2 * M_PI;
 odometria->robot_Angulo_deg=(odometria->robot_Angulo_rad*180.0)/M_PI;
 }
+
 void motores(motores_init_t* motores)
 {
 	  __HAL_TIM_SetCompare(&Motor,TIM_CHANNEL_1,motores->pwmL);
