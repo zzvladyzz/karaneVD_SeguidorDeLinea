@@ -1,3 +1,0 @@
-../Core/Src/LIB_FiltroMadgWick.c:8:6:madgwickInit	1
-../Core/Src/LIB_FiltroMadgWick.c:29:6:madgwickUpdateIMU	4
-../Core/Src/LIB_FiltroMadgWick.c:126:7:invSqrt	1
