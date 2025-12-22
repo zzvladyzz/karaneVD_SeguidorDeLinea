@@ -26,7 +26,7 @@ void madgwickInit(MadgWick_t* init){
 
 }
 
-void madgwickUpdateIMU(MadgWick_t* qD,MPU6500_float_t* mpu6500_float_DPS_G)
+void madgwickUpdateIMU(MadgWick_t* qD,MPU6500_Init_float_t* mpu6500_float_DPS_G)
 {
 
 	float recipNorm;

@@ -59,13 +59,7 @@ MPU6500_status_e	MPU6500_Status;
 uint32_t ADC_DMA[5];	//datos DMA
 volatile uint16_t ADC_buffer[4]; //datos ya obtenidos y convertidos a 16bits
 
-uint16_t duty_pwm=0;
-uint8_t en_pwm=0;
 uint16_t ADC_poll=0;
-uint32_t tiempoActual=0;
-uint32_t tiempoAnterior1=0;
-uint32_t tiempoAnterior2=0;
-uint32_t tiempo_conv=0;
 
 
 
@@ -168,7 +162,7 @@ int main(void)
   MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, &ADC_DMA[0], 4);
-  HAL_ADC_Start_IT(&hadc1);/// lo volvemos a activar por que no activamos la conversion continua en el IOC
+  HAL_ADC_Start_IT(&hadc1);/// activa la interrupcion del dma para leer los datos
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
@@ -199,36 +193,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //HAL_ADC_Start_IT(&hadc1);
-
-	  for(;;){
-		  tiempoActual=HAL_GetTick();
-		  if(tiempoActual-tiempoAnterior1>=1003)
-		  {
-			  tiempoAnterior1=tiempoActual;
-			  /*tiempo_conv=HAL_GetTick();
-			  for(int x=0;x<13;x++)
-			  {
-			  }
-			  HAL_Delay(1);
-			  tiempo_conv=HAL_GetTick()-tiempo_conv;*/
-
-		  }
 
 
-	  }
-	  /*
- HAL_GPIO_WritePin(EN_MOT_GPIO_Port, EN_MOT_Pin, 1);
- 	  MPU6500_Read(&MPU_6500_Read);
-	  MPU_6500_float=MPU6500_Scale(&MPU_6500_Read, DPS1000_CONV, G4_CONV);
-	  //madgwickUpdateIMU(&MadgWick, &MPU_6500_float);
-
-	  sprintf(bufferTxt," pitch= %0.2f ",(MPU6500_Pitch(&MPU_6500_float)));
-	  UART_Send(&huart3, bufferTxt);
-
-	  sprintf(bufferTxt," roll= %0.2f \r\n",(MPU6500_Roll(&MPU_6500_float)));
-	  UART_Send(&huart3, bufferTxt);
-	  HAL_Delay(10);*/
 
   }
   /* USER CODE END 3 */

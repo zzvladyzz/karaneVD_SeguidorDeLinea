@@ -41,7 +41,7 @@ typedef struct{
 
 void madgwickInit(MadgWick_t* init);
 //valor en DPS dentro de funcion lo convierte a rad/s
-void  madgwickUpdateIMU(MadgWick_t* datos,MPU6500_float_t* mpu6500_float_DPS_G);
+void  madgwickUpdateIMU(MadgWick_t* datos,MPU6500_Init_float_t* mpu6500_float_DPS_G);
 void  madgwickGetAngles(MadgWick_t* angles);
 
 float madgwickGetRollRadians(MadgWick_t* angles);

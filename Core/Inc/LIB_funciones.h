@@ -41,5 +41,6 @@ typedef struct
 
 void funcion_odometria(odometria_init_t* odometria);
 void motores(motores_init_t* motores);
+float Filtro_Kalman_odometria(float delta_theta_encoders,float gyro_rate_z,float dt);
 
 #endif /* INC_LIB_FUNCIONES_H_ */

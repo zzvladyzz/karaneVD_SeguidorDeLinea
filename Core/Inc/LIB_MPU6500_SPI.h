@@ -97,8 +97,9 @@
 #define G8_CONV		16
 #define G4_CONV		8
 #define G2_CONV		4
-
-//creamos una union para los valores ya que registro nos entrega en dos registros
+/**
+ * @brief Estructura tipo union para realizar conversiones del registro del MPU
+ */
 typedef union{
 	uint16_t MPU6500_uint16;
 	int16_t  MPU6500_int16;
@@ -106,7 +107,9 @@ typedef union{
 	int8_t   MPU6500_int8[2];
 }MPU6500_int_u;
 
-//Creamos una struct donde leeremos tanto offset como datos
+/**
+ * @brief Estructura donde se guardara los datos y dentro creamos las variables usando la estructura de union
+ */
 typedef struct{
 	MPU6500_int_u MPU6500_GYROX;
 	MPU6500_int_u MPU6500_GYROY;
@@ -115,7 +118,9 @@ typedef struct{
 	MPU6500_int_u MPU6500_ACCELY;
 	MPU6500_int_u MPU6500_ACCELZ;
 }MPU6500_Init_Values_t;
-
+/**
+ * @brief Estructura donde obtendremos los datos si son necesarion en float para calculos
+ */
 typedef struct{
 	float MPU6500_floatGX;
 	float MPU6500_floatGY;
@@ -123,22 +128,22 @@ typedef struct{
 	float MPU6500_floatAX;
 	float MPU6500_floatAY;
 	float MPU6500_floatAZ;
-}MPU6500_float_t;
+}MPU6500_Init_float_t;
 
+/**
+ * @brief Estructura tipo enum para verificar que el MPU avise en tal caso de fallo
+ */
 typedef enum{MPU6500_ok,MPU6500_fail}MPU6500_status_e;
 
 
-//Para ver que no sucede un error al inicializar mpu y
-// Reset registros y validar ID y realizar primeras lecturas offset
-
-MPU6500_status_e 		MPU6500_Init(MPU6500_Init_Values_t* offset,uint8_t N,uint8_t dps,uint8_t g);// Mejorar codigo muestreo
+MPU6500_status_e 		MPU6500_Init(MPU6500_Init_Values_t* offset,uint8_t N,uint8_t dps,uint8_t g);
 void		MPU6500_Read(MPU6500_Init_Values_t* valoresMPU);
 uint8_t 	MPU6500_Read_Reg(uint8_t Reg);
 void 		MPU6500_Write_Reg(uint8_t Reg,uint8_t value);
 void		MPU6500_Write(uint8_t Reg,uint8_t *value, uint8_t len);
-MPU6500_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv);
-float		MPU6500_Pitch(MPU6500_float_t* convPitch);
-float		MPU6500_Roll(MPU6500_float_t* convRoll);
+MPU6500_Init_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv);
+float		MPU6500_Pitch(MPU6500_Init_float_t* convPitch);
+float		MPU6500_Roll(MPU6500_Init_float_t* convRoll);
 
 
 

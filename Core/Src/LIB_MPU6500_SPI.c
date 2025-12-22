@@ -10,10 +10,11 @@
 #include "spi.h"
 
 
-
-
-//Funciones
-
+/**
+ * @brief lee los valores en bruto del MPU
+ * @param valoresMPU: Se debe mandar una estructura de tipo MPU6500_Init_values_t
+ * @retval Se regresara valores en la misma estructura recibida
+ */
 void	MPU6500_Read(MPU6500_Init_Values_t* valoresMPU){
 	uint8_t Reg=MPU_READ|ACCEL_XOUT_H;
 	uint8_t	Val[6];
@@ -162,9 +163,9 @@ MPU6500_status_e	MPU6500_Init(MPU6500_Init_Values_t * offset,uint8_t N,uint8_t d
 	return MPU6500_ok;
 
 }
-MPU6500_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv)
+MPU6500_Init_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv)
 {
-	MPU6500_float_t convDatos;
+	MPU6500_Init_float_t convDatos;
 	convDatos.MPU6500_floatAX=(raw->MPU6500_ACCELX.MPU6500_int16)/gConv;
 	convDatos.MPU6500_floatAY=(raw->MPU6500_ACCELY.MPU6500_int16)/gConv;
 	convDatos.MPU6500_floatAZ=(raw->MPU6500_ACCELZ.MPU6500_int16)/gConv;
@@ -175,7 +176,7 @@ MPU6500_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,floa
 
 	return convDatos;
 }
-float		MPU6500_Pitch(MPU6500_float_t* convPitch){
+float		MPU6500_Pitch(MPU6500_Init_float_t* convPitch){
 
 	  float accelX=convPitch->MPU6500_floatAX;
 	  float accelY=convPitch->MPU6500_floatAY;
@@ -186,7 +187,7 @@ float		MPU6500_Pitch(MPU6500_float_t* convPitch){
 	  angulo_pitch=angulo_pitch*(180.0/PI);
 	  return angulo_pitch;
 }
-float		MPU6500_Roll(MPU6500_float_t* convRoll){
+float		MPU6500_Roll(MPU6500_Init_float_t* convRoll){
 	//float accelX=convRoll->MPU6500_floatAX;
 	float accelY=convRoll->MPU6500_floatAY;
 	float accelZ=convRoll->MPU6500_floatAZ;

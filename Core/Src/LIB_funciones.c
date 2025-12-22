@@ -52,6 +52,43 @@ if (odometria->robot_Angulo_rad > M_PI) odometria->robot_Angulo_rad -= 2 * M_PI;
 if (odometria->robot_Angulo_rad < -M_PI) odometria->robot_Angulo_rad += 2 * M_PI;
 odometria->robot_Angulo_deg=(odometria->robot_Angulo_rad*180.0)/M_PI;
 }
+ /**
+  * @brief Fusiona encoders y giroscopio para obtener Theta
+  * @param delta_theta_encoders: El cambio de ángulo calculado por encoders
+  * @param gyro_rate_z: Velocidad angular del eje Z (en rad/s) del sensor IMU
+  * @param dt: Tiempo transcurrido (ej. 0.01f para 10ms)
+  * @return Angulo fusionado y filtrado
+  */
+float Filtro_Kalman_odometria(float delta_theta_encoders,float gyro_rate_z,float dt)
+ {
+	// --- Variables del Filtro de Kalman ---
+	float Q_angle = 0.001f;   // Proceso: Confianza en el modelo de los encoders
+	float R_angle = 0.01f;    // Medición: Confianza en el Giroscopio
+	float angle_estimado = 0.0f;
+	float P_error = 1.0f;     // Covarianza del error
+	float K_gain = 0.0f;      // Ganancia de Kalman
+
+	// --- PASO 1: PREDICCIÓN (Basada en encoders) ---
+	// Usamos el movimiento de los encoders como base del modelo
+	angle_estimado += delta_theta_encoders;
+	P_error += Q_angle;
+
+	// --- PASO 2: MEDICIÓN (Basada en Giroscopio) ---
+	// El giroscopio mide velocidad, así que lo integramos para tener ángulo
+	float angulo_medido_gyro = angle_estimado + (gyro_rate_z * dt);
+
+	// --- PASO 3: ACTUALIZACIÓN (Fusión) ---
+	// Calcular la Ganancia de Kalman
+	K_gain = P_error / (P_error + R_angle);
+
+	// Corregir el ángulo estimado con la medición del gyro
+	angle_estimado = angle_estimado + K_gain * (angulo_medido_gyro - angle_estimado);
+
+	// Actualizar la covarianza del error para el próximo ciclo
+	P_error = (1.0f - K_gain) * P_error;
+
+	return angle_estimado;
+ }
 
 void motores(motores_init_t* motores)
 {
