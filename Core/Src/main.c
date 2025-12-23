@@ -31,10 +31,11 @@
 #include <stdio.h>
 #include <math.h>
 #include "LIB_MPU6500_SPI.h"
-#include "LIB_FiltroMadgWick.h"
 #include "LIB_DEBUG.h"
-#include "LIB_funciones.h"
+#include "LIB_FUNCIONES.h"
+#include "LIB_MENU.h"
 
+#define	Delay_BTN	200		// Tiempo para verificar los ADC por DMA
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,27 +46,27 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-/*
- *Aca tendremos la estructura para los datos del programa
- */
+
 odometria_init_t odometria={0.0,0.0,0.0,0.0,0,0};
 MPU6500_Init_Values_t 	MPU6500_Datos; //Iniciamos donde se guardaran todos los datos a leer
 //MPU6500_float_t	MPU6500_Values_float;
 MPU6500_status_e	MPU6500_Status;
-//MadgWick_t 		MadgWick;
 
 
-
+/* Variables para los ADC */
 uint32_t ADC_DMA[5];	//datos DMA
 volatile uint16_t ADC_buffer[4]; //datos ya obtenidos y convertidos a 16bits
+uint16_t ADC_Sensor=0;
+uint8_t ValorBTN=0;
 
-uint16_t ADC_poll=0;
-
-
-
+/* Variables para los encoders*/
 const int8_t estadoTabla[16]={0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0}; //valor encoders de tabla de verdad
 uint8_t estadoAnterior_L=0;
 uint8_t estadoAnterior_R=0;
+
+/* Variables para definir tiempo de espera */
+uint32_t tiempoActual=0;
+uint32_t tiempoAnterior=0;
 
 
 /* USER CODE END PD */
@@ -98,6 +99,19 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		ADC_buffer[1]=(uint16_t)ADC_DMA[1];
 		ADC_buffer[2]=(uint16_t)ADC_DMA[2];
 		ADC_buffer[3]=(uint16_t)ADC_DMA[3];
+		/*filtramos el boton pulsado en un rango*/
+		if(ADC_buffer[3]>1500 && ADC_buffer[3]<1800)
+		{
+			ValorBTN=1;
+		}
+		else if(ADC_buffer[3]>2000 && ADC_buffer[3]<2300)
+				{
+					ValorBTN=2;
+				}
+		else if(ADC_buffer[3]>2500 && ADC_buffer[3]<3000)
+				{
+					ValorBTN=3;
+				}
 	}
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -120,7 +134,7 @@ void leer_ADC(void)
 {
 	HAL_ADC_Start(&hadc2);
 	HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
-	ADC_poll=HAL_ADC_GetValue(&hadc2);
+	ADC_Sensor=HAL_ADC_GetValue(&hadc2);
 	HAL_ADC_Stop(&hadc2);
 }
 /* USER CODE END 0 */
@@ -162,7 +176,7 @@ int main(void)
   MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, &ADC_DMA[0], 4);
-  HAL_ADC_Start_IT(&hadc1);/// activa la interrupcion del dma para leer los datos
+  //HAL_ADC_Start_IT(&hadc1);/// activa la interrupcion del dma para leer los datos
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
@@ -176,12 +190,11 @@ int main(void)
   if (MPU6500_Status==MPU6500_fail) {
   	for (;;) {
   		DEBUG_Imprimir("Fallo al iniciar MPU\r\n");
-  		HAL_Delay(500);
+  		Menu_Avisos(Aviso_fallo_comunicacion);
   		}
   }
   DEBUG_Imprimir("Exito al iniciar MPU\r\n");
-  HAL_Delay(500);
-
+  Menu_Avisos(Aviso_ok);
 
   /* USER CODE END 2 */
 
@@ -194,8 +207,21 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	  /* Esta parte simplemente cada X tiempo verificara el DMA para ver el estado del BTN*/
+	  tiempoActual=HAL_GetTick();
+	  if ((tiempoActual-tiempoAnterior)>Delay_BTN) {
+		tiempoAnterior=tiempoActual;
+		HAL_ADC_Start_IT(&hadc1);// iniciamos conversion ADC
+	  }
 
-
+	  /* Obtenido el valor del BTN y siempre distinto a 0*/
+	  if(ValorBTN!=0)
+	  {
+		  Menu_Navegacion(ValorBTN);
+		  ValorBTN=0;	// Se reetablece valor para evitar que vuelva a entrar
+	  }
+	  /* Aca se ejecutara el codigo si se dio aceptar y dependiendo el menu donde este*/
+	  Menu_Ejecucion();
   }
   /* USER CODE END 3 */
 }

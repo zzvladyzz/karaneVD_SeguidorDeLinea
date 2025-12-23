@@ -8,19 +8,32 @@
 #ifndef INC_LIB_MPU6500_SPI_H_
 #define INC_LIB_MPU6500_SPI_H_
 
-#ifndef PI
-#define PI	3.14159265358979323846
-#endif
-
-#ifndef ALPHA
-#define AlPHA	0.98
-#endif
-
 #include <stdint.h>
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI	3.14159265358979323846
+#endif
 
-// definiciones registros MPU6500
+#ifndef ALPHA
+#define ALPHA	0.98
+#endif
+
+#ifndef DPS_TO_RADS
+#define DPS_TO_RADS	0.0174533f
+#endif
+
+/**
+ * @brief	Definiciones para ser usadas por el filtro Madgwick
+ */
+#define SampleFrequency		100		//Frecuencia en HZ
+#define betaDef				0.3f	//Ganancia proporcional 2
+
+
+
+/**
+ * 	@brief	Definiciones usadas para el MPU65000
+ */
 #define	MPU_READ		0X80
 #define	MPU_WRITE		0X00
 
@@ -130,11 +143,36 @@ typedef struct{
 	float MPU6500_floatAZ;
 }MPU6500_Init_float_t;
 
+
+/**
+ * @brief Estructura para datos del filtro
+ */
+typedef struct{
+	float beta;
+	float q0;
+	float q1;
+	float q2;
+	float q3;
+	float roll;
+	float pitch;
+	float yaw;
+	float invSampleFrequency;
+	uint8_t anglesComputed;
+	float gx;
+	float gy;
+	float gz;
+	float ax;
+	float ay;
+	float az;
+}MadgWick_t;
+
+
 /**
  * @brief Estructura tipo enum para verificar que el MPU avise en tal caso de fallo
  */
 typedef enum{MPU6500_ok,MPU6500_fail}MPU6500_status_e;
 
+/*	Funciones para el MPU	*/
 
 MPU6500_status_e 		MPU6500_Init(MPU6500_Init_Values_t* offset,uint8_t N,uint8_t dps,uint8_t g);
 void		MPU6500_Read(MPU6500_Init_Values_t* valoresMPU);
@@ -144,7 +182,14 @@ void		MPU6500_Write(uint8_t Reg,uint8_t *value, uint8_t len);
 MPU6500_Init_float_t		MPU6500_Converter(MPU6500_Init_Values_t* raw,float dpsConv,float gConv);
 float		MPU6500_Pitch(MPU6500_Init_float_t* convPitch);
 float		MPU6500_Roll(MPU6500_Init_float_t* convRoll);
+void 		MPU6500_Filtro_Complementario(MPU6500_Init_float_t* data,float *anguloPitch,float *anguloRoll);
 
+
+/*	Funciones para el filtro Madgwick	*/
+
+void madgwickInit(MadgWick_t* init);
+void  madgwickUpdateIMU(MadgWick_t* datos,MPU6500_Init_float_t* mpu6500_float_DPS_G);
+float invSqrt(float x);
 
 
 

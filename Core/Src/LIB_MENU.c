@@ -6,55 +6,66 @@
  */
 #include "LIB_MENU.h"
 #include "gpio.h"
-//static Avisos_Alarmas_e 	Aviso;
-static Menu_Parametros_e 	Menu=Pagina_Inicial;
+
+
+//static Estado_LED_e 	Aviso=Aviso_espera;
+static Menu_Parametros_e 	Menu=Menu_Inicial;
 static bool BTN_SEL=false;
-static Tiempo_espera_s Tiempo_={0,false,0};
+static Tiempo_espera_s Tiempo={0,true,0};
 
 
-
-void	Tiempo_Espera()
+/**
+ *	@brief 	Se ejecuta un tiempo de espera para los avisos
+ */
+void	Tiempo_Espera(void)
 {
 
 	uint32_t tiempo_actual=HAL_GetTick();
-	switch (Tiempo_.estado_interno) {
+	switch (Tiempo.estado_interno) {
 		case 0:
-			Tiempo_.tiempo_espera=tiempo_actual;
-			Tiempo_.en_espera=true;
-			Tiempo_.estado_interno=1;
+			Tiempo.tiempo_de_espera=tiempo_actual;
+			Tiempo.esperando=true;
+			Tiempo.estado_interno=1;
 			break;
 		case 1:
-			if(tiempo_actual-Tiempo_.tiempo_espera>20)
+			if(tiempo_actual-Tiempo.tiempo_de_espera>300)
 			{
-				Tiempo_.estado_interno=2;
+				Tiempo.estado_interno=2;
 			}
 			break;
 		case 2:
-			Tiempo_.estado_interno=0;
-			Tiempo_.en_espera=false;
+			Tiempo.estado_interno=0;
+			Tiempo.esperando=false;
 			break;
 		default:
 			break;
 	}
 }
+
 /**
- * @brief Menu donde se vera en que opcion entrar
- * @param Menu recibira un enum para ver en que parte del menu nos encontramos
- * @param Pulsador es una valor de 1 a 3 que viene de los pulsadores ya filtrado
+ * @brief 	Menu donde se vera en que opcion entrar
+ * @param	MENU: Se debe inicializar el ENUM antes para poder mover entre menus
+ * @param 	BTN: Es una valor de 1 a 3 que viene de los pulsadores ya filtrado
+ * @note	Una vez terminada esta funcion verificar que el valor del adc o del pulsador quede
+ * 			en cero para evitar los rebotes innecesarios
  */
 void 	Menu_Navegacion(uint8_t BTN)
 {
+
 	if(BTN_SEL==false){
 		switch (BTN) {
-			case BTN_ARRIBA:
-				Menu=(Menu==Pagina_Inicial)?Pagina_Final:(Menu-1);
+			case BTN_DERECHA:
+				Menu=(Menu==Menu_Inicial)?Menu_Final:(Menu-1);
+				Menu_LED(Estado_BTN_derecha);
 				break;
-			case BTN_ABAJO:
-				Menu=(Menu==Pagina_Final)?Pagina_Inicial:(Menu+1);
+			case BTN_IZQUIERDA:
+				Menu=(Menu==Menu_Final)?Menu_Inicial:(Menu+1);
+				Menu_LED(Estado_BTN_izquierda);
 				break;
 			case BTN_ACEPTAR:
 				Menu=Menu;
 				BTN_SEL=true;
+				Menu_LED(Estado_BTN_ok);
 				break;
 			default:
 				break;
@@ -62,8 +73,9 @@ void 	Menu_Navegacion(uint8_t BTN)
 	}
 	else{
 		switch (BTN) {
-			case BTN_ARRIBA:
+			case BTN_ACEPTAR:
 				BTN_SEL=false;
+				Menu_LED(Estado_BTN_salir);
 				break;
 			default:
 				break;
@@ -79,31 +91,35 @@ void	Menu_Ejecucion(void)
 {
 	if(BTN_SEL==true){
 		switch (Menu) {
-			case Pagina_Inicial:
-
+			case Menu_Inicial:
+				Menu_Avisos(Aviso_espera);
 				break;
 			case Opcion_Iniciar_CodigoA:
-
+				Menu_Avisos(Aviso_error_sensor);
 				break;
 			case Opcion_Calibracion_IMU:
-
+				Menu_Avisos(Aviso_bateria_baja);
 				break;
 			case Opcion_Calibracion_Sensores:
-
+				Menu_Avisos(Aviso_desconectado);
 				break;
 			case Opcion_Calibracion_X:
-
+				Menu_Avisos(Aviso_fallo);
 				break;
 			case Opcion_Configuracion_PID_1:
-
+				Menu_Avisos(Aviso_fallo_comunicacion);
 				break;
 			case Opcion_Configuracion_PID_2:
-
+				Menu_Avisos(Aviso_ok);
 				break;
 			case Opcion_Monitoreo:
-
+				Menu_Avisos(Aviso_procesando);
 				break;
 			case Opcion_Guardar:
+				Menu_Avisos(Aviso_fallo_comunicacion);
+				break;
+			case Menu_Final:
+				Menu_Avisos(Aviso_espera);
 				break;
 
 			default:
@@ -114,70 +130,131 @@ void	Menu_Ejecucion(void)
 
 /**
  * @brief Aca se indicara mediante leds los errores o cualquier otra accion
- * @param Aviso sera un valor entero con el cual se sabra que led usar
+ * @param Aviso: Se debera mandar una estructura para saber que aviso atender con los LED's
+ * @note	Esta funcion necesita ser llamada mediante los retardos de esta misma lib para parpadear
+ * 			los avisos
  */
-void Menu_Avisos(Avisos_Alarmas_e Aviso_)
+void Menu_Avisos(Estado_LED_e Alarmas)
 {
-	switch(Aviso_){
-			case 0://FALLO PARA CUALQUIER PROBLEMA
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 1);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 1);
+	Tiempo_Espera();
+	if(Tiempo.esperando==false)
+	{
+		switch(Alarmas){
+			case Aviso_fallo:
+				HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+				HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+				HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+				HAL_GPIO_TogglePin(LED4_GPIO_Port, LED4_Pin);
+				HAL_GPIO_TogglePin(LED5_GPIO_Port, LED5_Pin);
+				HAL_GPIO_TogglePin(LED6_GPIO_Port, LED6_Pin);
 				break;
-			case 1:// LED PARA VERIFICAR QUE SE INICIALIZO ALGUN MODULO
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 0);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 0);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 0);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 0);
+			case Aviso_bateria_baja:
+				HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+				HAL_GPIO_TogglePin(LED6_GPIO_Port, LED6_Pin);
 				break;
-			case 2:// LED PARA INDICAR QUE SE PULSO EL BOTON PARA ARRIBA
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 0);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 1);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 1);
+			case Aviso_ok:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
 				break;
-			case 3:// LED PARA INDICAR QUE SE PULSO EL BOTON DE ABAJO
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 0);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 0);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 0);
+			case Aviso_desconectado:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
 				break;
-			case 4:// LED PARA INDICAR QUE SE PULSO EL BOTON DE ACEPTAR
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 0);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 0);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 1);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 1);
+			case Aviso_conectado:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+				HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+				HAL_GPIO_TogglePin(LED4_GPIO_Port, LED4_Pin);
+				HAL_GPIO_TogglePin(LED5_GPIO_Port, LED5_Pin);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
 				break;
-			case 5:// LED PARA INDICAR QUE SE ESTAN INGRESANDO PARAMETROS
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 0);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 0);
+			case Aviso_espera:	//Desde aca seria los avisos en binario 1
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
 				break;
-			case 6:// LED PARA INDICAR QUE SE INICIO EL PROGRAMA
-				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
-				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
-				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, 0);
-				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, 0);
+			case Aviso_procesando:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
+				break;
+			case Aviso_error_sensor:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+				HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+				HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
+				break;
+			case Aviso_fallo_comunicacion:
+				HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin,	GPIO_PIN_RESET);
+				HAL_GPIO_TogglePin(LED4_GPIO_Port, LED4_Pin);
+				HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
 				break;
 			default:
 				break;
-
-
+		}
 	}
 }
+void	Menu_LED(Estado_LED_e LED)
+{
+	switch(LED){
+				case Estado_BTN_derecha:
+					HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+					HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_SET);
+					break;
+				case Estado_BTN_izquierda:
+					HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+					HAL_GPIO_TogglePin(LED6_GPIO_Port, LED6_Pin);
+					break;
+				case Estado_BTN_ok:
+					HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+					HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_RESET);
+					break;
+				case Estado_BTN_salir:
+					HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+					HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, GPIO_PIN_RESET);
+					break;
+				default:
+					break;
+
+		}
+}
+
