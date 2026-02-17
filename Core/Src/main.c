@@ -38,6 +38,8 @@
 
 #define	Delay_BTN	200		// Tiempo para verificar los ADC por DMA
 #define Delay_LED	50		// Tiempo para apagar LEDs
+#define	ADC_VREF	3.35
+#define	Volt_Proteccion 	6.6
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,21 +51,20 @@
 /* USER CODE BEGIN PD */
 
 
-odometria_init_t odometria={0.0,0.0,0.0,0.0,0,0};
+volatile odometria_init_t odometria={0.0,0.0,0.0,0.0,0,0};
 MPU6500_Init_Values_t 	MPU6500_Datos; //Iniciamos donde se guardaran todos los datos a leer
-//MPU6500_float_t	MPU6500_Values_float;
+MPU6500_Init_float_t	MPU6500_Values_float;
 MPU6500_status_e	MPU6500_Status;
 
 /* Variables para los ADC */
 uint32_t ADC_DMA[5];	//datos DMA
 volatile uint16_t ADC_buffer[4]; //datos ya obtenidos y convertidos a 16bits
-uint16_t ADC_Sensor=0;
-uint8_t ValorBTN=0;
+volatile uint8_t ValorBTN=0;
 
 /* Variables para los encoders*/
 const int8_t estadoTabla[16]={0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0}; //valor encoders de tabla de verdad
-uint8_t estadoAnterior_L=0;
-uint8_t estadoAnterior_R=0;
+volatile uint8_t estadoAnterior_L=0;
+volatile uint8_t estadoAnterior_R=0;
 
 /* Variables para definir tiempo de espera */
 uint32_t tiempoActual=0;
@@ -72,6 +73,19 @@ uint32_t tiempoAnterior_LED=0;
 
 bool	timeValid=false;
 
+/*variables para Regleta de sensores*/
+
+static uint8_t PosicionesSensores[16]={7,6,5,4,3,2,1,0,8,9,10,11,12,13,14,15};
+volatile uint8_t 	MuxSel=0;
+volatile uint16_t 	RegletaSensores[16]={0};
+
+
+/*Timers para funciones*/
+volatile bool		Timer_5ms_IR=false;
+volatile bool	Timer_50ms_ADC_DMA=false;
+volatile bool		Timer_100ms_PID=false;
+volatile uint16_t	ContadorTimer=0;
+volatile uint16_t	ContadorTimerPID=0;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -116,6 +130,25 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 					ValorBTN=BTN_ACEPTAR;
 				}
 	}
+
+	if(hadc->Instance==ADC2)
+	{
+		RegletaSensores[MuxSel] =(uint16_t) HAL_ADC_GetValue(hadc); // Lee el resultado
+
+		if(MuxSel<16)
+			  {
+			  MuxSel++;
+			  HAL_ADC_Start_IT(hadc);
+			  }
+			  else{
+				  MuxSel=0;
+			  }
+		HAL_GPIO_WritePin(S0_mux_GPIO_Port, S0_mux_Pin, (PosicionesSensores[MuxSel]&1));
+		HAL_GPIO_WritePin(S1_mux_GPIO_Port, S1_mux_Pin, (PosicionesSensores[MuxSel]&2)>>1);
+		HAL_GPIO_WritePin(S2_mux_GPIO_Port, S2_mux_Pin, (PosicionesSensores[MuxSel]&4)>>2);
+		HAL_GPIO_WritePin(S3_mux_GPIO_Port, S3_mux_Pin, (PosicionesSensores[MuxSel]&8)>>3);
+	}
+
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
@@ -133,12 +166,34 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		estadoAnterior_R=bitStatusR;
 		}
 }
-void leer_ADC(void)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+   if (htim->Instance == TIM3) {
+        // Tarea de 5ms: Marcar bandera para leer sensores IR
+        Timer_5ms_IR = false;
+        ContadorTimer++;
+        if(ContadorTimer>50)
+        {
+        	Timer_50ms_ADC_DMA=true;
+        	ContadorTimer=0;
+        }
+        if(ContadorTimerPID>20)
+        {
+        	Timer_100ms_PID=true;
+        	ContadorTimerPID=0;
+        }
+
+    }
+}
+void motor(uint16_t pwmMI,uint16_t pwmMD,bool EnableMotor)
 {
-	HAL_ADC_Start(&hadc2);
-	HAL_ADC_PollForConversion(&hadc2, HAL_MAX_DELAY);
-	ADC_Sensor=HAL_ADC_GetValue(&hadc2);
-	HAL_ADC_Stop(&hadc2);
+	pwmMI=(pwmMI>999)?999:pwmMI;
+	pwmMD=(pwmMD>999)?999:pwmMD;
+
+	  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_1,pwmMD);
+	  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_2,0);
+	  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_3,0);
+	  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_4,pwmMI);
+	  HAL_GPIO_WritePin(EN_MOT_GPIO_Port, EN_MOT_Pin, EnableMotor);
 }
 /* USER CODE END 0 */
 
@@ -177,17 +232,8 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM1_Init();
   MX_ADC2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADC_Start_DMA(&hadc1, &ADC_DMA[0], 4);
-  //HAL_ADC_Start_IT(&hadc1);/// activa la interrupcion del dma para leer los datos
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_1,0);
-  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_2,0);
-  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_3,0);
-  __HAL_TIM_SetCompare(&htim1,TIM_CHANNEL_4,0);
 
   MPU6500_Status=MPU6500_Init(&MPU6500_Datos,10,DPS1000,G4);
   if (MPU6500_Status==MPU6500_fail) {
@@ -198,7 +244,17 @@ int main(void)
   }
   DEBUG_Imprimir("Exito al iniciar MPU\r\n");
   Menu_LED(Aviso_ok);
-  HAL_Delay(2000);
+  HAL_Delay(1000);
+ HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+ HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+ HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+ motor(0, 0, 0);
+ __HAL_TIM_MOE_ENABLE(&htim1);
+
+ HAL_ADC_Start_DMA(&hadc1, &ADC_DMA[0], 4);
+ HAL_ADC_Start_IT(&hadc1);
+ HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
@@ -212,23 +268,61 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  /* Esta parte simplemente cada X tiempo verificara el DMA para ver el estado del BTN*/
-	  tiempoActual=HAL_GetTick();
-	  if ((tiempoActual-tiempoAnterior)>Delay_BTN) {
-		tiempoAnterior=tiempoActual;
-		DEBUG_ADC(ADC_Sensor, ADC_buffer[0], ADC_buffer[1], ADC_buffer[2], ADC_buffer[3]);
+
+	  if (Timer_50ms_ADC_DMA) {
+		float ADC_buffer_float[4];
+		ADC_buffer_float[0]=(ADC_VREF*ADC_buffer[0])/4095;
+		ADC_buffer_float[1]=(ADC_VREF*ADC_buffer[1])/4095;
+		ADC_buffer_float[2]=(ADC_VREF*ADC_buffer[2])/4095;
+		ADC_buffer_float[3]=(ADC_VREF*ADC_buffer[3])/4095;
+
+		ADC_buffer_float[2]=ADC_buffer_float[2]*3.2;
+		//DEBUG_ADC_Value(ADC_buffer_float[0], ADC_buffer_float[1], ADC_buffer_float[2], ADC_buffer_float[3]);
 		HAL_ADC_Start_IT(&hadc1);// iniciamos conversion ADC
+		Timer_50ms_ADC_DMA=false;
+		//DEBUG_Encoders(odometria.ticks_L, odometria.ticks_R, 0);
+		MPU6500_Read(&MPU6500_Datos);
+		MPU6500_Values_float=MPU6500_Converter(&MPU6500_Datos, DPS1000_CONV, G4_CONV);
+		DEBUG_IMU_Conv(MPU6500_Values_float.MPU6500_floatAX,MPU6500_Values_float.MPU6500_floatAY,MPU6500_Values_float.MPU6500_floatAZ,MPU6500_Values_float.MPU6500_floatGX,MPU6500_Values_float.MPU6500_floatGY,MPU6500_Values_float.MPU6500_floatGZ);
 	  }
 
+	  if (Timer_5ms_IR) {
+		  Timer_5ms_IR=false;
+		  HAL_ADC_Start_IT(&hadc2);
+
+		DEBUG_RegletaSensores(RegletaSensores[0]);
+		DEBUG_RegletaSensores(RegletaSensores[1]);
+		DEBUG_RegletaSensores(RegletaSensores[2]);
+		DEBUG_RegletaSensores(RegletaSensores[3]);
+		DEBUG_RegletaSensores(RegletaSensores[4]);
+		DEBUG_RegletaSensores(RegletaSensores[5]);
+		DEBUG_RegletaSensores(RegletaSensores[6]);
+		DEBUG_RegletaSensores(RegletaSensores[7]);
+		DEBUG_RegletaSensores(RegletaSensores[8]);
+		DEBUG_RegletaSensores(RegletaSensores[9]);
+		DEBUG_RegletaSensores(RegletaSensores[10]);
+		DEBUG_RegletaSensores(RegletaSensores[11]);
+		DEBUG_RegletaSensores(RegletaSensores[12]);
+		DEBUG_RegletaSensores(RegletaSensores[13]);
+		DEBUG_RegletaSensores(RegletaSensores[14]);
+		DEBUG_RegletaSensores(RegletaSensores[15]);
+		  char bufferTxt[30];
+		    sprintf(bufferTxt," hola\r\n ");
+			HAL_UART_Transmit(&huart3, (uint8_t *)bufferTxt, strlen(bufferTxt), HAL_MAX_DELAY);
+
+			}
 	  /*
 	   * Obtenido el valor del BTN y siempre distinto a 0
 	   * si entra a la funcion se genera un delay de tiempo para apagar los leds
 	   * */
+	  tiempoActual=HAL_GetTick();
 	  if(ValorBTN!=0)
 	  {
 		  Menu_LED(Apagar_LED);
 		  timeValid=Menu_Navegacion(ValorBTN);
 		  ValorBTN=0;	// Se reetablece valor para evitar que vuelva a entrar
 		  tiempoAnterior_LED=HAL_GetTick();
+		  motor(500, 500, 1);
 	  }
 	  if(timeValid==true)
 	  {
@@ -238,6 +332,9 @@ int main(void)
 		  		Menu_LED(estadoLED);
 		  		}
 	  }
+
+
+
 	  /* Aca se ejecutara el codigo si se dio aceptar y dependiendo el menu donde este*/
 	  if(Menu_Ejecucion()==true)
 	  {

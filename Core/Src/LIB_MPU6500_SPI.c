@@ -8,8 +8,9 @@
 
 #include "gpio.h"
 #include "spi.h"
-
-
+#define		SPI_PORT			hspi2
+#define 	SPI_PORT_NSS		SPI_NSS_GPIO_Port
+#define		SPI_PIN_NSS			SPI_NSS_Pin
 /**
  * @brief lee los valores en bruto del MPU
  * @param valoresMPU: Se debe mandar una estructura de tipo MPU6500_Init_values_t
@@ -18,10 +19,10 @@
 void	MPU6500_Read(MPU6500_Init_Values_t* valoresMPU){
 	uint8_t Reg=MPU_READ|ACCEL_XOUT_H;
 	uint8_t	Val[6];
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
-	HAL_SPI_Transmit(&hspi2, &Reg, 1, HAL_MAX_DELAY);
-	HAL_SPI_Receive(&hspi2,&Val[0],6, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 1);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 0);
+	HAL_SPI_Transmit(&SPI_PORT, &Reg, 1, HAL_MAX_DELAY);
+	HAL_SPI_Receive(&SPI_PORT,&Val[0],6, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 1);
 	HAL_Delay(1);
 	valoresMPU->MPU6500_ACCELX.MPU6500_uint8[1]=Val[0];
 	valoresMPU->MPU6500_ACCELX.MPU6500_uint8[0]=Val[1];
@@ -31,10 +32,10 @@ void	MPU6500_Read(MPU6500_Init_Values_t* valoresMPU){
 	valoresMPU->MPU6500_ACCELZ.MPU6500_uint8[0]=Val[5];
 
 	Reg=MPU_READ|GYRO_XOUT_H;
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
-	HAL_SPI_Transmit(&hspi2, &Reg, 1, HAL_MAX_DELAY);
-	HAL_SPI_Receive(&hspi2,&Val[0],6, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 1);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 0);
+	HAL_SPI_Transmit(&SPI_PORT, &Reg, 1, HAL_MAX_DELAY);
+	HAL_SPI_Receive(&SPI_PORT,&Val[0],6, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 1);
 	HAL_Delay(1);
 	/**
 	 * 	@note	Al usar unio para mover datos y convertirlos automaticamente los DATOS MSB se encuentran
@@ -55,10 +56,10 @@ void	MPU6500_Read(MPU6500_Init_Values_t* valoresMPU){
 uint8_t 	MPU6500_Read_Reg(uint8_t Reg){
 	uint8_t Value=0;
 	Reg=Reg|MPU_READ;
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
-	HAL_SPI_Transmit(&hspi2, &Reg, 1, HAL_MAX_DELAY);
-	HAL_SPI_Receive(&hspi2,&Value, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 1);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 0);
+	HAL_SPI_Transmit(&SPI_PORT, &Reg, 1, HAL_MAX_DELAY);
+	HAL_SPI_Receive(&SPI_PORT,&Value, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 1);
 	return Value;
 }
 /**
@@ -68,10 +69,10 @@ uint8_t 	MPU6500_Read_Reg(uint8_t Reg){
  */
 void 	MPU6500_Write_Reg(uint8_t Reg,uint8_t value){
 	Reg=Reg|MPU_WRITE;
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
-	HAL_SPI_Transmit(&hspi2, &Reg, 1, HAL_MAX_DELAY);
-	HAL_SPI_Transmit(&hspi2,&value, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 1);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 0);
+	HAL_SPI_Transmit(&SPI_PORT, &Reg, 1, HAL_MAX_DELAY);
+	HAL_SPI_Transmit(&SPI_PORT,&value, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 1);
 	HAL_Delay(1);
 }
 
@@ -83,10 +84,10 @@ void 	MPU6500_Write_Reg(uint8_t Reg,uint8_t value){
  */
 void	MPU6500_Write(uint8_t Reg,uint8_t* value, uint8_t  len){
 	Reg=Reg|MPU_WRITE;
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 0);
-	HAL_SPI_Transmit(&hspi2, &Reg, 1, HAL_MAX_DELAY);
-	HAL_SPI_Transmit(&hspi2, value, len, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI_NSS_GPIO_Port, SPI_NSS_Pin, 1);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 0);
+	HAL_SPI_Transmit(&SPI_PORT, &Reg, 1, HAL_MAX_DELAY);
+	HAL_SPI_Transmit(&SPI_PORT, value, len, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(SPI_PORT_NSS, SPI_PIN_NSS, 1);
 	HAL_Delay(1);
 }
 

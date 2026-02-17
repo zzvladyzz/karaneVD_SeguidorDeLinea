@@ -101,15 +101,15 @@
 #define G4				0b00001000
 #define G2				0b00000000
 
-#define DPS2000_CONV	4000
-#define DPS1000_CONV	2000
-#define DPS500_CONV		1000
-#define DPS250_CONV		500
+#define DPS2000_CONV	16.4
+#define DPS1000_CONV	32.8
+#define DPS500_CONV		65.5
+#define DPS250_CONV		131
 
-#define G16_CONV	32
-#define G8_CONV		16
-#define G4_CONV		8
-#define G2_CONV		4
+#define G16_CONV	2048
+#define G8_CONV		4096
+#define G4_CONV		8192
+#define G2_CONV		16384
 /**
  * @brief Estructura tipo union para realizar conversiones del registro del MPU
  */
