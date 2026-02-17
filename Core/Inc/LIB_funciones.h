@@ -36,14 +36,31 @@ typedef struct{
  */
 typedef struct
 {
-	uint16_t pwmR;
-	uint16_t pwmL;
+	uint16_t pwmRA;
+	uint16_t pwmRB;
+	uint16_t pwmLB;
+	uint16_t pwmLA;
 	bool  enable_PWM;
 }motores_init_t;
 
+/**
+ * @brief Estructura para el PID
+ */
+typedef struct
+{
+	float	kp;
+	float	ki;
+	float	kd;
+	float	ultimoError;
+	float	integral;
+	float	winup;
+	float	PWM_Maximo;
+
+}PID;
 
 void funcion_odometria(odometria_init_t* odometria);
 void funcion_motores(motores_init_t* motores);
+float funcion_calcularPID(PID* pid,int16_t setpoint,int16_t actual,float dt);
 float funcion_Filtro_Kalman_odometria(float delta_theta_encoders,float gyro_rate_z,float dt);
 
 #endif /* INC_LIB_FUNCIONES_H_ */
