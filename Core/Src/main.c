@@ -79,16 +79,16 @@ bool	timeValid=false;
 static uint8_t PosicionesSensores[16]={7,6,5,4,3,2,1,0,8,9,10,11,12,13,14,15};
 volatile uint8_t 	MuxSel=0;
 volatile uint16_t 	RegletaSensores[16]={0};
-int UltimaPosicion	=500;
-unsigned long sumaPonderada = 0;
-unsigned long sumaLecturas = 0;
-long valor=0;
-unsigned long peso=0;
+volatile int UltimaPosicion	=500;
+volatile unsigned long sumaPonderada = 0;
+volatile unsigned long sumaLecturas = 0;
+volatile long valor=0;
+volatile unsigned long peso=0;
 /*Timers para funciones*/
-volatile bool		Timer_5ms_IR=false;
-volatile bool	Timer_50ms_ADC_DMA=false;
-volatile bool		Timer_100ms_PID=false;
-volatile uint16_t	ContadorTimer=0;
+
+volatile bool	Timer_ADC_DMA=false;
+volatile bool		Timer_PID=false;
+volatile uint16_t	ContadorTimerDMA=0;
 volatile uint16_t	ContadorTimerPID=0;
 /* USER CODE END PD */
 
@@ -142,37 +142,30 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		if(MuxSel<16)
 			{
 			valor = RegletaSensores[MuxSel];
-			// Umbral de ruido: 10% del valor máximo (4000 * 0.1 = 400)
-			if (valor > 400) {
+			// Se realizara una media ponderada normalizada entre 0-1000 donde 0 es iquierda y 1000 derecha
+			// Umbral de ruido: 10% del valor máximo (4095 * 0.1 = 409)
+			if (valor > 409) {
 				// Peso del sensor (de 0 a 1000)
 				peso = (MuxSel * 1000L) / (NumSensores - 1);
-				// La multiplicación puede llegar a 4,000,000 por sensor
-				// Con 16 sensores, el total cabe perfectamente en un unsigned long
 				sumaPonderada += peso * valor;
 				sumaLecturas += valor;
 				}
 			MuxSel++;
-			HAL_ADC_Start_IT(hadc);
 			}
 		else{
-					if (sumaLecturas == 0) {
-						if (UltimaPosicion < 450) UltimaPosicion=0;
-						if (UltimaPosicion > 550) UltimaPosicion=1000;
-						}
-					else{
+
 						UltimaPosicion = (int)(sumaPonderada / sumaLecturas);
 						MuxSel=0;
 						sumaLecturas=0;
 						sumaPonderada=0;
 						peso=0;
 						valor=0;
-					}
 			}
-
 		HAL_GPIO_WritePin(S0_mux_GPIO_Port, S0_mux_Pin, (PosicionesSensores[MuxSel]&1));
 		HAL_GPIO_WritePin(S1_mux_GPIO_Port, S1_mux_Pin, (PosicionesSensores[MuxSel]&2)>>1);
 		HAL_GPIO_WritePin(S2_mux_GPIO_Port, S2_mux_Pin, (PosicionesSensores[MuxSel]&4)>>2);
 		HAL_GPIO_WritePin(S3_mux_GPIO_Port, S3_mux_Pin, (PosicionesSensores[MuxSel]&8)>>3);
+		//HAL_ADC_Start_IT(hadc);
 	}
 
 }
@@ -194,17 +187,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
    if (htim->Instance == TIM3) {
-        // Tarea de 5ms: Marcar bandera para leer sensores IR
-        Timer_5ms_IR = true;
-        ContadorTimer++;
-        if(ContadorTimer>12)
+	   /*	Timer3 a 200us preescaler de 71 y cnt 199*/
+	   HAL_ADC_Start_IT(&hadc2);
+	   ContadorTimerDMA++;
+	   ContadorTimerPID=0;
+        if(ContadorTimerDMA>100)
         {
-        	Timer_50ms_ADC_DMA=true;
-        	ContadorTimer=0;
+        	Timer_ADC_DMA=true;
+        	ContadorTimerDMA=0;
         }
-        if(ContadorTimerPID>23)
+        if(ContadorTimerPID>250)
         {
-        	Timer_100ms_PID=true;
+        	Timer_PID=true;
         	ContadorTimerPID=0;
         }
 
@@ -295,7 +289,7 @@ int main(void)
 
 	  /* Esta parte simplemente cada X tiempo verificara el DMA para ver el estado del BTN*/
 
-	  if (Timer_50ms_ADC_DMA) {
+	  if (Timer_ADC_DMA) {
 		float ADC_buffer_float[4];
 		ADC_buffer_float[0]=(ADC_VREF*ADC_buffer[0])/4095;
 		ADC_buffer_float[1]=(ADC_VREF*ADC_buffer[1])/4095;
@@ -305,7 +299,7 @@ int main(void)
 		ADC_buffer_float[2]=ADC_buffer_float[2]*3.2;
 		//DEBUG_ADC_Value(ADC_buffer_float[0], ADC_buffer_float[1], ADC_buffer_float[2], ADC_buffer_float[3]);
 
-		Timer_50ms_ADC_DMA=false;
+		Timer_ADC_DMA=false;
 		//DEBUG_Encoders(odometria.ticks_L, odometria.ticks_R, 0);
 		MPU6500_Read(&MPU6500_Datos);
 		MPU6500_Values_float=MPU6500_Converter(&MPU6500_Datos, DPS1000_CONV, G4_CONV);
@@ -321,10 +315,7 @@ int main(void)
 			HAL_ADC_Start_IT(&hadc1);// iniciamos conversion ADC
 	  }
 
-	  if (Timer_5ms_IR) {
-		  Timer_5ms_IR=false;
-		  HAL_ADC_Start_IT(&hadc2);
-			}
+
 	  /*
 	   * Obtenido el valor del BTN y siempre distinto a 0
 	   * si entra a la funcion se genera un delay de tiempo para apagar los leds
